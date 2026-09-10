@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Intelligent Test Planning Agent</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10" stroke="#3B82F6"/>
+            <circle cx="12" cy="12" r="6" stroke="#2563EB"/>
+            <circle cx="12" cy="12" r="2" fill="#1D4ED8"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="app-title">Intelligent Test Planning Agent</h1>
+          <p class="app-subtitle">Generate comprehensive test plans from Jira requirements using AI</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="connection-pill" id="globalStatusPill">
+          <span class="status-dot online"></span>
+          <span id="globalStatusText">Ollama: Ready</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="viewHistoryBtn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          View History
+        </button>
+      </div>
+    </header>
+
+    <!-- Stepper Navigation -->
+    <nav class="stepper-nav">
+      <button class="step-tab active" data-step="1">
+        <span class="step-num">1</span> Setup
+      </button>
+      <button class="step-tab" data-step="2">
+        <span class="step-num">2</span> Fetch Issues
+      </button>
+      <button class="step-tab" data-step="3">
+        <span class="step-num">3</span> Review
+      </button>
+      <button class="step-tab" data-step="4">
+        <span class="step-num">4</span> Test Plan
+      </button>
+    </nav>
+
+    <!-- MAIN CONTENT SECTIONS -->
+    <main class="main-content">
+      
+      <!-- STEP 1: SETUP -->
+      <section class="step-section active" id="step1">
+        <!-- Jira Connection Card -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Jira Connection</h2>
+              <p class="card-desc">Connect to your Jira instance on the fly to fetch user stories and requirements</p>
+            </div>
+            <span class="badge badge-neutral" id="jiraStatusBadge">Not Connected</span>
+          </div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="form-group full-width">
+                <label for="jiraUrl">Jira Host URL *</label>
+                <input type="text" id="jiraUrl" class="form-control" placeholder="e.g. https://your-domain.atlassian.net or 'demo' for mock stories" value="demo">
+                <span class="form-hint">Enter your Atlassian Cloud URL, Server URL, or keep 'demo' to test with VWO sample issues.</span>
+              </div>
+              <div class="form-group">
+                <label for="jiraEmail">Email / Username</label>
+                <input type="text" id="jiraEmail" class="form-control" placeholder="qa.engineer@company.com">
+              </div>
+              <div class="form-group">
+                <label for="jiraToken">API Token / PAT</label>
+                <div class="input-with-action">
+                  <input type="password" id="jiraToken" class="form-control" placeholder="Atlassian API Token">
+                  <button type="button" class="btn-toggle-pw" onclick="togglePassword('jiraToken')">👁️</button>
+                </div>
+              </div>
+            </div>
+            <div class="card-actions">
+              <button class="btn btn-outline" id="btnTestJira">
+                <span class="spinner hidden" id="jiraSpinner"></span>
+                Test Jira Connection
+              </button>
+              <div class="test-feedback" id="jiraFeedback"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LLM Engine Configuration Card (Configurable Ollama, Groq, Grok, ChatGPT, Claude) -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">AI Engine Settings (LLM Connection)</h2>
+              <p class="card-desc">Choose and test your AI reasoning provider for generating deterministic test plans</p>
+            </div>
+            <span class="badge badge-success" id="llmStatusBadge">Ollama Online</span>
+          </div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="llmProvider">LLM Provider *</label>
+                <select id="llmProvider" class="form-control">
+                  <option value="ollama" selected>Ollama (Local)</option>
+                  <option value="groq">Groq Cloud (Fast Llama 3.3)</option>
+                  <option value="grok">Grok (xAI API)</option>
+                  <option value="chatgpt">ChatGPT (OpenAI API)</option>
+                  <option value="claude">Claude (Anthropic API)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="llmModel">Model Name *</label>
+                <input type="text" id="llmModel" class="form-control" value="llama3.2:3b">
+                <span class="form-hint" id="llmModelHint">Detected locally: llama3.2:3b, llama3.2:1b</span>
+              </div>
+              <div class="form-group">
+                <label for="llmBaseUrl">Base Endpoint URL</label>
+                <input type="text" id="llmBaseUrl" class="form-control" value="http://localhost:11434">
+              </div>
+              <div class="form-group">
+                <label for="llmApiKey">API Key</label>
+                <div class="input-with-action">
+                  <input type="password" id="llmApiKey" class="form-control" placeholder="Optional for local Ollama">
+                  <button type="button" class="btn-toggle-pw" onclick="togglePassword('llmApiKey')">👁️</button>
+                </div>
+              </div>
+            </div>
+            <div class="card-actions">
+              <button class="btn btn-outline" id="btnTestLlm">
+                <span class="spinner hidden" id="llmSpinner"></span>
+                Test Connection
+              </button>
+              <div class="test-feedback" id="llmFeedback"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Test Plan Template Configuration (Inbuilt vs Custom in Excel format) -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Test Plan Template Format</h2>
+              <p class="card-desc">Select between the standard enterprise template or upload a custom Excel template</p>
+            </div>
+            <span class="badge badge-primary">Excel & Word Ready</span>
+          </div>
+          <div class="card-body">
+            <div class="template-choice-grid">
+              <label class="template-option active" id="optionInbuilt">
+                <input type="radio" name="templateChoice" value="inbuilt" checked>
+                <div class="template-opt-content">
+                  <div class="template-opt-title">
+                    <span class="opt-icon">📊</span> Inbuilt Template (Excel & Word)
+                  </div>
+                  <p class="template-opt-desc">Pre-configured corporate format matching VWO test plan standards (Overview, Test Cases, Risks & Approvals).</p>
+                  <div class="template-meta-tags">
+                    <span class="tag">Multi-sheet .xlsx</span>
+                    <span class="tag">Styled .docx</span>
+                    <span class="tag">Automated Fields</span>
+                  </div>
+                </div>
+              </label>
+
+              <label class="template-option" id="optionCustom">
+                <input type="radio" name="templateChoice" value="custom">
+                <div class="template-opt-content">
+                  <div class="template-opt-title">
+                    <span class="opt-icon">📁</span> Custom Template (Excel Format)
+                  </div>
+                  <p class="template-opt-desc">Upload your organization's custom Excel workbook with customized columns and custom attributes.</p>
+                  <div class="template-meta-tags">
+                    <span class="tag">Custom Columns</span>
+                    <span class="tag">Header Auto-Mapping</span>
+                  </div>
+                  <div class="file-drop-zone hidden" id="customDropZone">
+                    <input type="file" id="customFile" accept=".xlsx, .xls">
+                    <p>Drag & drop custom <code>.xlsx</code> template or <span class="text-blue">browse</span></p>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Import from Test Management Tools -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Import from Test Management Tools</h2>
+              <p class="card-desc">Connect to your existing test case repositories and management platforms</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="platform-grid">
+              <div class="platform-card active-platform">
+                <div class="platform-top">
+                  <span class="platform-icon jira-bg">🎯</span>
+                  <span class="badge badge-success">Available</span>
+                </div>
+                <div class="platform-name">Jira</div>
+                <p class="platform-desc">Import requirements and user stories from Atlassian Jira.</p>
+                <ul class="platform-features">
+                  <li>Requirements import</li>
+                  <li>User stories & acceptance criteria</li>
+                  <li>Sprint / JQL filtering</li>
+                </ul>
+                <button class="btn btn-sm btn-primary w-100" onclick="goToStep(2)">Connected</button>
+              </div>
+
+              <div class="platform-card">
+                <div class="platform-top">
+                  <span class="platform-icon ado-bg">🔷</span>
+                  <span class="badge badge-neutral">Coming Soon</span>
+                </div>
+                <div class="platform-name">Azure DevOps</div>
+                <p class="platform-desc">Import user stories, work items and test suites from ADO.</p>
+                <ul class="platform-features">
+                  <li>Work items import</li>
+                  <li>Azure Test Plans sync</li>
+                  <li>Sprint backlog query</li>
+                </ul>
+                <button class="btn btn-sm btn-outline w-100" disabled>Notify Me</button>
+              </div>
+
+              <div class="platform-card">
+                <div class="platform-top">
+                  <span class="platform-icon xray-bg">📦</span>
+                  <span class="badge badge-neutral">Coming Soon</span>
+                </div>
+                <div class="platform-name">Xray</div>
+                <p class="platform-desc">Import native Jira test cases and test plans from Xray.</p>
+                <ul class="platform-features">
+                  <li>Test case sync</li>
+                  <li>BDD scenarios</li>
+                  <li>Execution sets</li>
+                </ul>
+                <button class="btn btn-sm btn-outline w-100" disabled>Notify Me</button>
+              </div>
+
+              <div class="platform-card">
+                <div class="platform-top">
+                  <span class="platform-icon tr-bg">🚆</span>
+                  <span class="badge badge-neutral">Coming Soon</span>
+                </div>
+                <div class="platform-name">TestRail</div>
+                <p class="platform-desc">Import existing test cases and test suites from TestRail.</p>
+                <ul class="platform-features">
+                  <li>Test suites</li>
+                  <li>Test runs</li>
+                  <li>Milestone sync</li>
+                </ul>
+                <button class="btn btn-sm btn-outline w-100" disabled>Notify Me</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-actions">
+          <div></div>
+          <button class="btn btn-primary btn-lg" onclick="goToStep(2)">
+            Continue to Fetch Issues →
+          </button>
+        </div>
+      </section>
+
+      <!-- STEP 2: FETCH ISSUES -->
+      <section class="step-section" id="step2">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Fetch Jira Requirements</h2>
+              <p class="card-desc">Enter project details or specific Jira keys to fetch user stories and requirements</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="productName">Product Name *</label>
+                <input type="text" id="productName" class="form-control" value="App.vwo.com" placeholder="e.g. App.vwo.com">
+              </div>
+              <div class="form-group">
+                <label for="projectKey">Project Key *</label>
+                <input type="text" id="projectKey" class="form-control" value="VWOAPP" placeholder="e.g. VWOAPP">
+              </div>
+              <div class="form-group">
+                <label for="sprintVersion">Sprint / Fix Version (Optional)</label>
+                <input type="text" id="sprintVersion" class="form-control" placeholder="e.g. Sprint 15 or leave empty">
+              </div>
+              <div class="form-group">
+                <label for="specificIssues">Specific Jira IDs (Optional)</label>
+                <input type="text" id="specificIssues" class="form-control" placeholder="e.g. VWOAPP-101, VWOAPP-102">
+              </div>
+              <div class="form-group full-width">
+                <label for="additionalContext">Additional Context (Optional)</label>
+                <textarea id="additionalContext" class="form-control" rows="3" placeholder="Any additional information about the product, testing goals, or constraints..."></textarea>
+              </div>
+            </div>
+            <div class="card-actions">
+              <button class="btn btn-primary btn-lg" id="btnFetchIssues">
+                <span class="spinner hidden" id="fetchSpinner"></span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                Fetch Jira Issues
+              </button>
+              <div class="test-feedback" id="fetchFeedback"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-actions">
+          <button class="btn btn-secondary" onclick="goToStep(1)">← Back to Setup</button>
+          <button class="btn btn-primary" id="btnProceedToReview" onclick="goToStep(3)" disabled>
+            Proceed to Review (0 Issues) →
+          </button>
+        </div>
+      </section>
+
+      <!-- STEP 3: REVIEW -->
+      <section class="step-section" id="step3">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Additional Context & Notes</h2>
+              <p class="card-desc">Add any special testing constraints, non-functional requirements, or specific areas of focus</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <textarea id="reviewContext" class="form-control" rows="4" placeholder="Add any additional context about the testing approach, special requirements, constraints, team structure, or specific areas of focus (e.g. Playwright automation, negative test boundary coverage)..."></textarea>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Review Jira Issues (<span id="issueCountBadge">0</span>)</h2>
+              <p class="card-desc">Select the user stories that will be synthesized into the comprehensive test plan</p>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="fetchJiraIssues()">
+              🔄 Refresh Issues
+            </button>
+          </div>
+          <div class="card-body">
+            <div id="issuesContainer" class="issues-list">
+              <div class="empty-state">
+                <p>No Jira issues loaded yet. Please click <strong>Fetch Jira Issues</strong> in Step 2.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-actions">
+          <button class="btn btn-secondary" onclick="goToStep(2)">← Back to Fetch</button>
+          <button class="btn btn-primary btn-lg" id="btnGeneratePlan">
+            <span class="spinner hidden" id="generateSpinner"></span>
+            ✨ Generate Test Plan
+          </button>
+        </div>
+      </section>
+
+      <!-- STEP 4: TEST PLAN OUTPUT -->
+      <section class="step-section" id="step4">
+        <!-- Empty state if not generated -->
+        <div class="card empty-test-plan" id="emptyPlanState">
+          <div class="empty-icon">📄</div>
+          <h2 class="empty-title">No test plan generated yet</h2>
+          <p class="empty-desc">Complete the previous steps to generate your enterprise test plan</p>
+          <button class="btn btn-primary" onclick="goToStep(2)">Start Planning</button>
+        </div>
+
+        <!-- Generated Plan Container -->
+        <div id="planContentContainer" class="hidden">
+          <!-- Top summary banner -->
+          <div class="plan-summary-banner">
+            <div>
+              <h2 class="plan-heading" id="planTitle">Test Plan: VWO Platform</h2>
+              <div class="plan-tags">
+                <span class="badge badge-primary" id="planKeyTag">VWOAPP</span>
+                <span class="badge badge-neutral" id="planModelTag">Ollama</span>
+                <span class="badge badge-success" id="planCasesCountTag">4 Test Cases</span>
+              </div>
+            </div>
+            <div class="plan-export-actions">
+              <button class="btn btn-outline btn-sm" onclick="exportPlan('docx')">
+                📥 Word (.docx)
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="exportPlan('xlsx')">
+                📊 Excel (.xlsx)
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="copyMarkdown()">
+                📋 Copy Markdown
+              </button>
+            </div>
+          </div>
+
+          <!-- Tabbed Viewer -->
+          <div class="plan-tabs-bar">
+            <button class="plan-tab active" data-tab="tabOverview">1. Overview & Scope</button>
+            <button class="plan-tab" data-tab="tabTestCases">2. Test Cases Grid</button>
+            <button class="plan-tab" data-tab="tabStrategy">3. Strategy & Environment</button>
+            <button class="plan-tab" data-tab="tabRisks">4. Criteria & Risks</button>
+          </div>
+
+          <div class="card plan-card">
+            <!-- Tab 1: Overview -->
+            <div class="plan-tab-pane active" id="tabOverview">
+              <h3 class="section-subtitle">Executive Objective</h3>
+              <p class="plan-text-block" id="planObjective"></p>
+
+              <h3 class="section-subtitle mt-4">Scope Definition</h3>
+              <div class="scope-columns">
+                <div class="scope-box in-scope">
+                  <h4>✅ In-Scope</h4>
+                  <ul id="planInclusions"></ul>
+                </div>
+                <div class="scope-box out-scope">
+                  <h4>❌ Out-of-Scope</h4>
+                  <ul id="planExclusions"></ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab 2: Test Cases Table -->
+            <div class="plan-tab-pane" id="tabTestCases">
+              <div class="tc-table-header">
+                <input type="text" id="tcSearch" class="form-control form-control-sm" placeholder="Search test cases by title, key, or type..." oninput="filterTestCases()">
+              </div>
+              <div class="table-responsive">
+                <table class="data-table" id="testCasesTable">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Jira Key</th>
+                      <th>Scenario / Title</th>
+                      <th>Type</th>
+                      <th>Priority</th>
+                      <th>Steps</th>
+                      <th>Expected Result</th>
+                      <th>Automation</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tcTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Tab 3: Strategy & Environment -->
+            <div class="plan-tab-pane" id="tabStrategy">
+              <h3 class="section-subtitle">Testing Types & Automation</h3>
+              <p class="plan-text-block" id="planStrategyText"></p>
+
+              <h3 class="section-subtitle mt-4">Target Environments</h3>
+              <div id="planEnvironmentsList" class="env-badges-grid"></div>
+            </div>
+
+            <!-- Tab 4: Risks & Approvals -->
+            <div class="plan-tab-pane" id="tabRisks">
+              <h3 class="section-subtitle">Entry & Exit Gates</h3>
+              <div class="gates-grid">
+                <div class="gate-box">
+                  <h4>🚪 Entry Criteria</h4>
+                  <ul id="planEntryCriteria"></ul>
+                </div>
+                <div class="gate-box">
+                  <h4>🏁 Exit Criteria</h4>
+                  <ul id="planExitCriteria"></ul>
+                </div>
+              </div>
+
+              <h3 class="section-subtitle mt-4">Identified Risks & Mitigations</h3>
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Risk Description</th>
+                      <th>Impact</th>
+                      <th>Mitigation Strategy</th>
+                    </tr>
+                  </thead>
+                  <tbody id="planRisksBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-actions">
+          <button class="btn btn-secondary" onclick="goToStep(3)">← Back to Review</button>
+          <div></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
