@@ -18,6 +18,10 @@ This document captures key technical takeaways, design decisions, challenges, an
 - **Resilience via Offline Mock Fallbacks**:
   - Developers and QA testers often need to test agent workflows without access to a production Jira tenant or corporate VPN.
   - Providing a first-class `"demo"` mode with realistic, multi-layered user stories (e.g. VWO platform campaign creation) drastically improves developer velocity and automated testing reliability.
+- **Zero-Friction Ingestion: Decoupling Requirements from Tool Dependencies**:
+  - Forcing users to configure external issue tracking tools (Jira, ADO) before experiencing any value leads to friction, abandonment, and permission bottlenecks (e.g. corporate SSO or restricted API token creation).
+  - In practice, QA engineers often receive requirement drafts from Slack threads, Confluence PRDs, Google Docs, or user story brainstorms.
+  - **Solution**: Designed a non-blocking dual-mode architecture. Users can immediately paste raw user stories, acceptance criteria, or acceptance test notes directly into the agent and generate a complete test plan in seconds, while preserving full, on-the-fly Jira integration for connected workflows.
 
 ---
 

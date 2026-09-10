@@ -46,7 +46,7 @@
         <span class="step-num">1</span> Setup
       </button>
       <button class="step-tab" data-step="2">
-        <span class="step-num">2</span> Fetch Issues
+        <span class="step-num">2</span> Requirements
       </button>
       <button class="step-tab" data-step="3">
         <span class="step-num">3</span> Review
@@ -65,8 +65,11 @@
         <div class="card">
           <div class="card-header">
             <div>
-              <h2 class="card-title">Jira Connection</h2>
-              <p class="card-desc">Connect to your Jira instance on the fly to fetch user stories and requirements</p>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <h2 class="card-title">Jira Connection</h2>
+                <span class="badge badge-neutral">Optional</span>
+              </div>
+              <p class="card-desc">Connect to your Jira instance on the fly, or skip if you prefer to write/paste story text directly in Step 2</p>
             </div>
             <span class="badge badge-neutral" id="jiraStatusBadge">Not Connected</span>
           </div>
@@ -270,14 +273,83 @@
         <div class="nav-actions">
           <div></div>
           <button class="btn btn-primary btn-lg" onclick="goToStep(2)">
-            Continue to Fetch Issues →
+            Continue to Requirements →
           </button>
         </div>
       </section>
 
-      <!-- STEP 2: FETCH ISSUES -->
+      <!-- STEP 2: REQUIREMENTS (DIRECT STORY OR JIRA) -->
       <section class="step-section" id="step2">
-        <div class="card">
+        <!-- Input Mode Selector -->
+        <div class="req-mode-switch">
+          <button type="button" class="req-mode-btn active" id="btnModeDirect" onclick="switchRequirementMode('direct')">
+            <span class="mode-icon">📝</span>
+            <div class="mode-info">
+              <div class="mode-btn-title">
+                Direct Story Input 
+                <span class="badge badge-success badge-sm">Instant / No Jira Needed</span>
+              </div>
+              <div class="mode-btn-sub">Write or paste user story, acceptance criteria, or PRD notes</div>
+            </div>
+          </button>
+          <button type="button" class="req-mode-btn" id="btnModeJira" onclick="switchRequirementMode('jira')">
+            <span class="mode-icon">🔗</span>
+            <div class="mode-info">
+              <div class="mode-btn-title">Fetch from Jira / ALM</div>
+              <div class="mode-btn-sub">Query issues from Jira Cloud, Server, or Demo instance</div>
+            </div>
+          </button>
+        </div>
+
+        <!-- MODE A: DIRECT USER STORY INPUT -->
+        <div class="card" id="cardDirectStory">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Direct User Story & Acceptance Criteria</h2>
+              <p class="card-desc">Enter your feature requirements below. You do not need any Jira connection to generate complete test plans.</p>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" id="btnLoadSampleStory" onclick="loadSampleStory()">
+              ✨ Load Sample Story
+            </button>
+          </div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="directProductName">Product / App Name *</label>
+                <input type="text" id="directProductName" class="form-control" value="VWO Platform" placeholder="e.g. E-Commerce Store, Mobile App">
+              </div>
+              <div class="form-group">
+                <label for="directStoryTitle">Story Title / Feature Name *</label>
+                <input type="text" id="directStoryTitle" class="form-control" placeholder="e.g. User Authentication & Social Single Sign-On">
+              </div>
+              <div class="form-group full-width">
+                <label for="directStoryText">User Story (Role, Goal, Benefit)</label>
+                <textarea id="directStoryText" class="form-control" rows="3" placeholder="As a registered user, I want to log in using Google OAuth or Email/Password, so that I can securely access my dashboard."></textarea>
+              </div>
+              <div class="form-group full-width">
+                <label for="directAcceptanceCriteria">Acceptance Criteria & Validation Rules *</label>
+                <textarea id="directAcceptanceCriteria" class="form-control" rows="6" placeholder="List your acceptance criteria, scenarios, or rules (one per line or numbered):&#10;1. User can sign in using Google SSO or valid Email/Password.&#10;2. Password requires minimum 8 characters with at least 1 number and 1 special symbol.&#10;3. Display 'Invalid credentials' on incorrect password attempt.&#10;4. Account is temporarily locked for 15 minutes after 5 consecutive failed attempts.&#10;5. User can initiate 'Forgot Password' to receive a time-bound (1-hour) reset link.&#10;6. Session automatically invalidates after 30 minutes of idle inactivity."></textarea>
+                <span class="form-hint">Tip: Include positive paths, boundary conditions, error cases, and non-functional requirements.</span>
+              </div>
+              <div class="form-group full-width">
+                <label for="directAdditionalNotes">Additional Testing Context (Optional)</label>
+                <input type="text" id="directAdditionalNotes" class="form-control" placeholder="e.g. Focus on Playwright automation, negative boundary testing, mobile responsive viewports">
+              </div>
+            </div>
+            <div class="card-actions">
+              <button class="btn btn-primary btn-lg" id="btnDirectGenerate" onclick="useDirectStory(true)">
+                ⚡ Generate Test Plan Now
+              </button>
+              <button class="btn btn-secondary btn-lg" onclick="useDirectStory(false)">
+                Review & Customize First →
+              </button>
+              <div class="test-feedback" id="directFeedback"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MODE B: FETCH FROM JIRA -->
+        <div class="card hidden" id="cardJiraFetch">
           <div class="card-header">
             <div>
               <h2 class="card-title">Fetch Jira Requirements</h2>
@@ -322,8 +394,8 @@
 
         <div class="nav-actions">
           <button class="btn btn-secondary" onclick="goToStep(1)">← Back to Setup</button>
-          <button class="btn btn-primary" id="btnProceedToReview" onclick="goToStep(3)" disabled>
-            Proceed to Review (0 Issues) →
+          <button class="btn btn-primary" id="btnProceedToReview" onclick="goToStep(3)">
+            Proceed to Review →
           </button>
         </div>
       </section>
@@ -345,17 +417,21 @@
         <div class="card">
           <div class="card-header">
             <div>
-              <h2 class="card-title">Review Jira Issues (<span id="issueCountBadge">0</span>)</h2>
+              <h2 class="card-title">Review Requirements & Stories (<span id="issueCountBadge">0</span>)</h2>
               <p class="card-desc">Select the user stories that will be synthesized into the comprehensive test plan</p>
             </div>
-            <button class="btn btn-outline btn-sm" onclick="fetchJiraIssues()">
-              🔄 Refresh Issues
-            </button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-outline btn-sm" onclick="goToStep(2)">
+                ✏️ Edit / Add Story
+              </button>
+            </div>
           </div>
           <div class="card-body">
             <div id="issuesContainer" class="issues-list">
               <div class="empty-state">
-                <p>No Jira issues loaded yet. Please click <strong>Fetch Jira Issues</strong> in Step 2.</p>
+                <p>No requirements loaded yet. Write your story directly in <strong>Step 2</strong> or fetch from Jira.</p>
+                <button class="btn btn-primary btn-sm" style="margin-top: 10px;" onclick="goToStep(2)">← Go to Step 2 to add story</button>
+              </div>
               </div>
             </div>
           </div>

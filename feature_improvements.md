@@ -27,6 +27,9 @@ This document outlines the strategic product roadmap and engineering enhancement
   - Automatically map generated test steps, preconditions, and custom fields into existing enterprise test management schemas.
 - **Confluence Direct Publishing**:
   - Publish formatted Test Plan documents directly to a designated Confluence Space and Parent Page with standard page templates.
+- **Direct PRD / Specification Document Upload**:
+  - Allow drag-and-drop upload of full Product Requirement Documents (PRDs in `.docx`, `.pdf`, or `.md`).
+  - Automatically extract and segment multi-feature documents into individual user stories, epics, and acceptance criteria for batch test planning.
 
 ---
 

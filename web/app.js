@@ -1,6 +1,7 @@
 // State management
 const state = {
   currentStep: 1,
+  reqMode: "direct",
   jira: {
     host: "demo",
     email: "",
@@ -235,6 +236,115 @@ async function testJiraConnection() {
   }
 }
 
+// --- Requirement Mode Switcher (Direct Story vs Jira) ---
+function switchRequirementMode(mode) {
+  state.reqMode = mode;
+  const btnDirect = document.getElementById("btnModeDirect");
+  const btnJira = document.getElementById("btnModeJira");
+  const cardDirect = document.getElementById("cardDirectStory");
+  const cardJira = document.getElementById("cardJiraFetch");
+
+  if (mode === "direct") {
+    btnDirect.classList.add("active");
+    btnJira.classList.remove("active");
+    cardDirect.classList.remove("hidden");
+    cardJira.classList.add("hidden");
+  } else {
+    btnDirect.classList.remove("active");
+    btnJira.classList.add("active");
+    cardDirect.classList.add("hidden");
+    cardJira.classList.remove("hidden");
+  }
+}
+
+// Pre-fill realistic sample story
+function loadSampleStory() {
+  document.getElementById("directProductName").value = "VWO Testing Platform";
+  document.getElementById("directStoryTitle").value = "Visual Website Optimizer - A/B Test Campaign Creation";
+  document.getElementById("directStoryText").value = 
+    "As a Growth Marketing Specialist, I want to configure and launch an A/B test campaign on my landing page, so that I can compare conversion rates between variations and increase sign-up conversions.";
+  
+  document.getElementById("directAcceptanceCriteria").value = 
+    "1. User can define Control (original URL) and at least one Variation URL.\n" +
+    "2. Visual Editor loads within 3 seconds and allows changing headlines, CTA button text, and colors.\n" +
+    "3. Traffic split percentage must total exactly 100% across all variations.\n" +
+    "4. Primary conversion goal must be selected (e.g. CTA Click, Page Visit, Form Submit, Revenue).\n" +
+    "5. Show validation error if campaign name contains special characters or exceeds 120 characters.\n" +
+    "6. Support targeting rules: device type (Desktop, Mobile, Tablet), geo-location, and cookie conditions.\n" +
+    "7. Campaign can be saved as Draft or launched directly into Live status.";
+
+  document.getElementById("directAdditionalNotes").value = 
+    "Focus on cross-browser compatibility (Chrome, Safari, Firefox), mobile viewports, and negative validation when traffic distribution != 100%.";
+
+  const feedback = document.getElementById("directFeedback");
+  feedback.textContent = "✓ Sample story loaded! You can now edit it or click 'Generate Test Plan Now'.";
+  feedback.className = "test-feedback success";
+}
+
+// Convert direct input into a standardized requirement issue
+function useDirectStory(generateImmediately = false) {
+  const prodName = document.getElementById("directProductName").value.trim() || "Web Application";
+  const title = document.getElementById("directStoryTitle").value.trim();
+  const storyText = document.getElementById("directStoryText").value.trim();
+  const criteriaText = document.getElementById("directAcceptanceCriteria").value.trim();
+  const extraNotes = document.getElementById("directAdditionalNotes").value.trim();
+  const feedback = document.getElementById("directFeedback");
+
+  if (!title) {
+    feedback.textContent = "✕ Please provide a Story Title or Feature Name.";
+    feedback.className = "test-feedback error";
+    document.getElementById("directStoryTitle").focus();
+    return;
+  }
+
+  if (!criteriaText) {
+    feedback.textContent = "✕ Please provide at least one Acceptance Criterion or rule.";
+    feedback.className = "test-feedback error";
+    document.getElementById("directAcceptanceCriteria").focus();
+    return;
+  }
+
+  // Parse acceptance criteria into list
+  const criteriaList = criteriaText
+    .split("\n")
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .map(line => line.replace(/^(\d+[\.\)]|\-|\*)\s*/, ""));
+
+  const directIssue = {
+    key: "STORY-01",
+    summary: title,
+    description: storyText || title,
+    acceptance_criteria: criteriaList,
+    type: "User Story",
+    priority: "High"
+  };
+
+  state.fetchedIssues = [directIssue];
+  state.selectedIssueKeys = new Set(["STORY-01"]);
+
+  if (extraNotes) {
+    const existingReviewNotes = document.getElementById("reviewContext").value;
+    if (!existingReviewNotes.includes(extraNotes)) {
+      document.getElementById("reviewContext").value = existingReviewNotes 
+        ? `${existingReviewNotes}\n${extraNotes}` 
+        : extraNotes;
+    }
+  }
+
+  feedback.textContent = `✓ Story packaged (${criteriaList.length} criteria). Ready for test planning.`;
+  feedback.className = "test-feedback success";
+
+  renderReviewIssues();
+
+  if (generateImmediately) {
+    goToStep(4);
+    generatePlan();
+  } else {
+    goToStep(3);
+  }
+}
+
 // 3. Fetch Jira Issues
 async function fetchJiraIssues() {
   const spinner = document.getElementById("fetchSpinner");
@@ -342,7 +452,8 @@ async function generatePlan() {
   const btn = document.getElementById("btnGeneratePlan");
 
   if (state.selectedIssueKeys.size === 0) {
-    alert("Please select at least one Jira issue to test!");
+    alert("Please enter a user story in Step 2 or fetch issues from Jira to test!");
+    goToStep(2);
     return;
   }
 
@@ -352,7 +463,17 @@ async function generatePlan() {
 
   const selectedIssues = state.fetchedIssues.filter(i => state.selectedIssueKeys.has(i.key));
   const reviewNotes = document.getElementById("reviewContext").value;
-  const initialContext = document.getElementById("additionalContext").value;
+  
+  const isDirect = state.reqMode === "direct";
+  const prodName = (isDirect 
+    ? document.getElementById("directProductName")?.value 
+    : document.getElementById("productName")?.value) || "Web Platform";
+  const projKey = (isDirect
+    ? (document.getElementById("directStoryTitle")?.value?.slice(0, 8)?.replace(/\s+/g, "_") || "STORY")
+    : document.getElementById("projectKey")?.value) || "REQ";
+  const initialContext = (isDirect
+    ? document.getElementById("directAdditionalNotes")?.value
+    : document.getElementById("additionalContext")?.value) || "";
   const combinedContext = [initialContext, reviewNotes].filter(Boolean).join("\n\n");
 
   const payload = {
@@ -364,8 +485,8 @@ async function generatePlan() {
     },
     issues: selectedIssues,
     context: combinedContext,
-    product_name: document.getElementById("productName").value || "VWO Platform",
-    project_key: document.getElementById("projectKey").value || "VWOAPP",
+    product_name: prodName,
+    project_key: projKey,
     template_type: state.templateType
   };
 

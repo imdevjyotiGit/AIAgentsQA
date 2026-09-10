@@ -12,7 +12,10 @@ The agent outputs formatted test plans in **Microsoft Word (`.docx`)**, **Micros
 
 ## 🌟 Key Capabilities
 
-- **On-the-Fly Jira Integration**: Connects via Jira REST API using Host URL, Email, and API Token. Includes an offline **Demo Mode** with realistic sample user stories (e.g., VWO A/B Testing platform requirements).
+- **Flexible Dual Requirements Ingestion**:
+  - **Direct Story / Text Input (Instant / No Jira Needed)**: Never feel blocked by tooling! Write or paste user story descriptions, acceptance criteria, or PRD notes directly into the agent. Click 1-click test plan generation immediately.
+  - **On-the-Fly Jira Integration**: Connects via Jira REST API using Host URL, Email, and API Token. Includes an offline **Demo Mode** with realistic sample user stories (e.g., VWO A/B Testing platform requirements).
+  - **Sample Story Preloader**: Includes 1-click realistic enterprise story loading to test generation instantly.
 - **Multi-Provider LLM Support**:
   - **Ollama (Local / Privacy-First)**: Local offline inference (`llama3.2:3b`, `llama3:8b`, `deepseek-r1`, `mistral`) ensuring zero sensitive requirement data leaves company infrastructure.
   - **OpenAI / ChatGPT**: `gpt-4o`, `gpt-4o-mini`
@@ -25,7 +28,7 @@ The agent outputs formatted test plans in **Microsoft Word (`.docx`)**, **Micros
   - Assumptions, Risks & Mitigations
   - Detailed Test Scenarios categorized by Type (Functional, Boundary, Edge Cases, Security, Performance)
   - Concrete Test Cases with Preconditions, Step-by-Step Instructions, Test Data, and Expected Results
-  - Requirements Traceability Matrix (RTM) linking test cases back to Jira Issue Keys
+  - Requirements Traceability Matrix (RTM) linking test cases back to Requirements/Jira Issue Keys
 - **Multi-Format Document Exporter**:
   - **Word (`.docx`)**: Styled executive document with formatted tables and headers matching standard corporate templates.
   - **Excel (`.xlsx`)**: Multi-tab workbook (`Overview`, `Test Scenarios`, `Detailed Test Cases`, `Traceability Matrix`) with styled headers and column auto-sizing.
@@ -113,12 +116,13 @@ http://127.0.0.1:8088
 ```
 
 1. **Step 1: Setup & Connection Verification**
-   - **Jira**: Input your Jira Cloud domain (e.g. `https://mycompany.atlassian.net`), email, and API token. Alternatively, keep `"demo"` for offline testing. Click **Test Jira Connection**.
+   - **Jira (Optional)**: Input your Jira Cloud domain (e.g. `https://mycompany.atlassian.net`), email, and API token, or keep `"demo"`. Alternatively, skip Jira entirely if you want to write/paste requirements directly!
    - **LLM**: Select your provider (Ollama, ChatGPT, Groq, Claude, Grok). Enter Base URL and API Key if applicable. Click **Test LLM Connection**.
-2. **Step 2: Fetch Requirements**
-   - Provide Product Name, Project Key (e.g. `VWO`), specific Issue Keys (e.g. `VWO-101, VWO-102`), or Sprint name. Click **Fetch Issues from Jira**.
+2. **Step 2: Enter Requirements (Direct Story or Jira)**
+   - **Option A (Direct Story Input - Default)**: Type or paste Story Title, User Story statement, and Acceptance Criteria. Click **⚡ Generate Test Plan Now** for instant generation, or click **✨ Load Sample Story** for a one-click demo.
+   - **Option B (Fetch from Jira)**: Query by Project Key, specific Issue Keys (e.g. `VWO-101`), or Sprint.
 3. **Step 3: Review & Refine Context**
-   - Review the extracted stories, acceptance criteria, and priority levels.
+   - Inspect the structured user story or fetched tickets.
    - Add custom domain context (e.g. *"Focus heavily on cross-browser compatibility and edge cases with slow networks"*).
    - Choose your template format: **Inbuilt Standardized Template** or **Custom Template**.
 4. **Step 4: Generate & Export Test Plan**
