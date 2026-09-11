@@ -14,13 +14,13 @@ The agent outputs formatted test plans in **Microsoft Word (`.docx`)**, **Micros
 
 - **Flexible Dual Requirements Ingestion**:
   - **Direct Story / Text Input (Instant / No Jira Needed)**: Never feel blocked by tooling! Write or paste user story descriptions, acceptance criteria, or PRD notes directly into the agent. Click 1-click test plan generation immediately.
-  - **On-the-Fly Jira Integration**: Connects via Jira REST API using Host URL, Email, and API Token. Includes an offline **Demo Mode** with realistic sample user stories (e.g., VWO A/B Testing platform requirements).
+  - **On-the-Fly Jira Integration**: Connects via Jira REST API using Host URL, Email, and API Token. Includes an offline **Demo Mode** with realistic sample user stories (e.g., XSM service management requirements).
   - **Sample Story Preloader**: Includes 1-click realistic enterprise story loading to test generation instantly.
-- **Multi-Provider LLM Support**:
+- **Multi-Provider LLM Support** (default provider: **Anthropic Claude**):
+  - **Anthropic Claude (Default)**: `claude-sonnet-5`, `claude-opus-5`, `claude-haiku-4-5-20251001`. Requires an Anthropic API key.
   - **Ollama (Local / Privacy-First)**: Local offline inference (`llama3.2:3b`, `llama3:8b`, `deepseek-r1`, `mistral`) ensuring zero sensitive requirement data leaves company infrastructure.
   - **OpenAI / ChatGPT**: `gpt-4o`, `gpt-4o-mini`
   - **Groq**: Ultra-low latency cloud inference (`llama-3.3-70b-versatile`)
-  - **Anthropic Claude**: `claude-3-5-sonnet`, `claude-3-haiku`
   - **xAI Grok**: `grok-2`
 - **Real-Time Handshake & Connectivity Testing**: Instant validation of Jira credentials and LLM endpoint health with visual status indicators before running expensive operations.
 - **Enterprise Test Plan Synthesis**:
@@ -116,11 +116,11 @@ http://127.0.0.1:8088
 ```
 
 1. **Step 1: Setup & Connection Verification**
-   - **Jira (Optional)**: Input your Jira Cloud domain (e.g. `https://mycompany.atlassian.net`), email, and API token, or keep `"demo"`. Alternatively, skip Jira entirely if you want to write/paste requirements directly!
-   - **LLM**: Select your provider (Ollama, ChatGPT, Groq, Claude, Grok). Enter Base URL and API Key if applicable. Click **Test LLM Connection**.
+   - **Jira (Optional)**: Input your Jira Cloud domain (e.g. `https://hclsw-io.atlassian.net`), email, and API token, or keep `"demo"`. Alternatively, skip Jira entirely if you want to write/paste requirements directly!
+   - **LLM**: Claude (Anthropic) is preselected by default — paste your Anthropic API key and click **Test Connection**. To use another provider (Ollama, ChatGPT, Groq, Grok), switch the dropdown; Base URL and model auto-fill.
 2. **Step 2: Enter Requirements (Direct Story or Jira)**
    - **Option A (Direct Story Input - Default)**: Type or paste Story Title, User Story statement, and Acceptance Criteria. Click **⚡ Generate Test Plan Now** for instant generation, or click **✨ Load Sample Story** for a one-click demo.
-   - **Option B (Fetch from Jira)**: Query by Project Key, specific Issue Keys (e.g. `VWO-101`), or Sprint.
+   - **Option B (Fetch from Jira)**: Query by Project Key, specific Issue Keys (e.g. `XSM-45372`), or Sprint.
 3. **Step 3: Review & Refine Context**
    - Inspect the structured user story or fetched tickets.
    - Add custom domain context (e.g. *"Focus heavily on cross-browser compatibility and edge cases with slow networks"*).

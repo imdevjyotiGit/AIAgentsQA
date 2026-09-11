@@ -1,0 +1,57 @@
+# Intelligent Test Planning Agent - local and single-host deployment.
+#
+#   docker compose up -d --build        # app only, uses an existing Ollama
+#   docker compose --profile with-ollama up -d --build   # app + bundled Ollama
+#
+# The app reaches Ollama at OLLAMA_BASE_URL. Which value is correct depends on
+# where Ollama runs - see the comments on that variable below.
+
+services:
+  agent:
+    build: .
+    image: test-planning-agent:latest
+    container_name: test-planning-agent
+    ports:
+      - "${APP_PORT:-8088}:8088"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8088
+      # Raise if a large local model needs longer than 10 minutes per plan.
+      LLM_TIMEOUT_SECONDS: "${LLM_TIMEOUT_SECONDS:-600}"
+      OLLAMA_NUM_CTX: "${OLLAMA_NUM_CTX:-16384}"
+      APP_VERSION: "${APP_VERSION:-dev}"
+    volumes:
+      # Generated exports and logs live outside the container so they survive
+      # a redeploy and can be collected by CI or a log shipper.
+      - agent-exports:/app/.tmp
+      - agent-logs:/app/logs
+    # Lets the container reach an Ollama running on the host machine as
+    # http://host.docker.internal:11434 (works on Docker Desktop; on Linux this
+    # extra_hosts entry provides the same name).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8088/health', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Optional bundled Ollama. Enable with: --profile with-ollama
+  # When used, set the app's Base URL in the UI to http://ollama:11434
+  ollama:
+    image: ollama/ollama:latest
+    container_name: test-planning-ollama
+    profiles: ["with-ollama"]
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      # Models are multi-GB - persist them so they are not re-pulled on restart.
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  agent-exports:
+  agent-logs:
+  ollama-models:

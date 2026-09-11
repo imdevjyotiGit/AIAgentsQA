@@ -76,37 +76,71 @@ def export_docx(plan, output_filepath):
     for item in scope.get("exclusions", ["Load & Stress testing", "Unsupported third-party plugins"]):
         doc.add_paragraph(f"• {item}", style="List Bullet")
 
-    # 3. Test Environments
-    add_section_header("3. Test Environments")
-    envs = plan.get("test_environments", [])
-    if envs:
+    # Shared builder for the simple two-column tables the template uses
+    # (Test Environments, Defect Reporting, Test Schedule, Tools).
+    def add_kv_table(headers, rows):
+        if not rows:
+            doc.add_paragraph("TBD")
+            return
         tbl = doc.add_table(rows=1, cols=2)
         tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
         hdr_cells = tbl.rows[0].cells
-        hdr_cells[0].text = "Category"
-        hdr_cells[1].text = "Specification / Version"
-        set_cell_background(hdr_cells[0], NAVY_HEX)
-        set_cell_background(hdr_cells[1], NAVY_HEX)
-        for c in hdr_cells:
-            for r in c.paragraphs[0].runs:
+        for i, h in enumerate(headers):
+            hdr_cells[i].text = h
+            set_cell_background(hdr_cells[i], NAVY_HEX)
+            for r in hdr_cells[i].paragraphs[0].runs:
                 r.font.bold = True
                 r.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
-
-        for e in envs:
+        for left, right in rows:
             row_cells = tbl.add_row().cells
-            row_cells[0].text = e.get("category", "Environment")
-            row_cells[1].text = e.get("specification", "")
+            row_cells[0].text = str(left or "")
+            row_cells[1].text = str(right or "")
             for c in row_cells:
                 c.paragraphs[0].paragraph_format.space_after = Pt(3)
 
-    # 4. Strategy
-    add_section_header("4. Test Strategy & Automation Approach")
+    def add_criteria(label, items, fallback):
+        doc.add_paragraph(label).runs[0].font.bold = True
+        for item in (items or fallback):
+            doc.add_paragraph(f"• {item}", style="List Bullet")
+
+    # 3. Test Environments  (template columns: Name | Env url)
+    add_section_header("3. Test Environments")
+    add_kv_table(
+        ["Name", "Env url"],
+        [(e.get("name", e.get("category", "Environment")),
+          e.get("url", e.get("specification", ""))) for e in plan.get("test_environments", [])]
+    )
+
+    # 4. Defect Reporting Procedure  (template columns: Defect Process | POC)
+    add_section_header("4. Defect Reporting Procedure")
+    defect = plan.get("defect_reporting", {}) or {}
+    if defect.get("procedure"):
+        doc.add_paragraph(defect["procedure"])
+    add_kv_table(
+        ["Defect Process", "POC"],
+        [(c.get("area", ""), c.get("poc", "TBD")) for c in defect.get("contacts", [])]
+    )
+
+    # 5. Strategy
+    add_section_header("5. Test Strategy & Automation Approach")
     strat = plan.get("test_strategy", {})
     doc.add_paragraph(f"Testing Types: {', '.join(strat.get('types', ['Functional', 'Smoke', 'Regression']))}")
     doc.add_paragraph(f"Automation Approach: {strat.get('automation_approach', 'Playwright framework for end-to-end flows.')}")
 
-    # 5. Test Cases Table
-    add_section_header("5. Detailed Test Cases")
+    # 6. Test Schedule  (template columns: Task | Dates)
+    add_section_header("6. Test Schedule")
+    add_kv_table(
+        ["Task", "Dates"],
+        [(s.get("task", ""), s.get("dates", "TBD")) for s in plan.get("test_schedule", [])]
+    )
+
+    # 7. Test Deliverables
+    add_section_header("7. Test Deliverables")
+    for item in plan.get("test_deliverables", ["Test Plan", "Test Cases", "Defect Reports", "Test Summary Report"]):
+        doc.add_paragraph(f"• {item}", style="List Bullet")
+
+    # 8. Test Cases Table
+    add_section_header("8. Detailed Test Cases")
     tcs = plan.get("test_cases", [])
     if tcs:
         tbl_tc = doc.add_table(rows=1, cols=7)
@@ -134,17 +168,38 @@ def export_docx(plan, output_filepath):
                 for r in c.paragraphs[0].runs:
                     r.font.size = Pt(8.5)
 
-    # 6. Entry & Exit Criteria
-    add_section_header("6. Entry & Exit Criteria")
-    doc.add_paragraph("Entry Criteria:").runs[0].font.bold = True
-    for item in plan.get("entry_criteria", ["Deployment to QA environment verified", "Test data available"]):
-        doc.add_paragraph(f"• {item}", style="List Bullet")
-    doc.add_paragraph("Exit Criteria:").runs[0].font.bold = True
-    for item in plan.get("exit_criteria", ["100% test cases executed", "No Blocker/Critical defects open"]):
-        doc.add_paragraph(f"• {item}", style="List Bullet")
+    # 9. Entry & Exit Criteria
+    add_section_header("9. Entry and Exit Criteria")
+    add_criteria("Entry Criteria:", plan.get("entry_criteria"),
+                 ["Deployment to QA environment verified", "Test data available"])
+    add_criteria("Exit Criteria:", plan.get("exit_criteria"),
+                 ["100% test cases executed", "No Blocker/Critical defects open"])
 
-    # 7. Risks & Mitigations
-    add_section_header("7. Risks & Mitigations")
+    # 10. Test Execution  (phase-specific criteria, per the template)
+    add_section_header("10. Test Execution")
+    execution = plan.get("test_execution", {}) or {}
+    add_criteria("Entry Criteria:", execution.get("entry_criteria"),
+                 ["Test cases reviewed and approved", "Test environment stable"])
+    add_criteria("Exit Criteria:", execution.get("exit_criteria"),
+                 ["All planned test cases executed", "Defects triaged"])
+
+    # 11. Test Closure
+    add_section_header("11. Test Closure")
+    closure = plan.get("test_closure", {}) or {}
+    add_criteria("Entry Criteria:", closure.get("entry_criteria"),
+                 ["Test execution complete", "Open defects agreed with stakeholders"])
+    add_criteria("Exit Criteria:", closure.get("exit_criteria"),
+                 ["Test summary report signed off", "Deliverables archived"])
+
+    # 12. Tools
+    add_section_header("12. Tools")
+    add_kv_table(
+        ["Purpose", "Tool"],
+        [(t.get("purpose", ""), t.get("tool", "TBD")) for t in plan.get("tools", [])]
+    )
+
+    # 13. Risks & Mitigations
+    add_section_header("13. Risks and Mitigations")
     risks = plan.get("risks_and_mitigations", [])
     if risks:
         tbl_r = doc.add_table(rows=1, cols=3)
@@ -161,8 +216,8 @@ def export_docx(plan, output_filepath):
             row[1].text = rk.get("impact", "")
             row[2].text = rk.get("mitigation", "")
 
-    # 8. Approvals
-    add_section_header("8. Approvals")
+    # 14. Approvals
+    add_section_header("14. Approvals")
     approvals = plan.get("approvals", [])
     if approvals:
         tbl_a = doc.add_table(rows=1, cols=3)
@@ -208,7 +263,7 @@ def export_xlsx(plan, output_filepath, template_type="inbuilt"):
 
     meta = plan.get("metadata", {})
     ws_ov.merge_cells("A1:F2")
-    ws_ov["A1"].value = f"TEST PLAN SPECIFICATION: {meta.get('product_name', 'VWO')}"
+    ws_ov["A1"].value = f"TEST PLAN SPECIFICATION: {meta.get('product_name', 'XSM')}"
     ws_ov["A1"].font = header_font
     ws_ov["A1"].fill = navy_fill
     ws_ov["A1"].alignment = Alignment(horizontal="center", vertical="center")
@@ -236,6 +291,75 @@ def export_xlsx(plan, output_filepath, template_type="inbuilt"):
     ws_ov.cell(row=row, column=1, value=exclusions_str).font = regular_font
     ws_ov.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
     row += 2
+
+    # Remaining template sections. Each is either a two-column table or a
+    # bulleted list, so drive them from one spec instead of repeating the
+    # styling block per section.
+    def write_section(title, kind, payload, headers=None):
+        nonlocal row
+        ws_ov.cell(row=row, column=1, value=title).font = Font(name="Segoe UI", size=11, bold=True, color="1F4E79")
+        ws_ov.cell(row=row, column=1).fill = blue_sub
+        ws_ov.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
+        row += 1
+        if kind == "table":
+            if not payload:
+                ws_ov.cell(row=row, column=1, value="TBD").font = regular_font
+                row += 2
+                return
+            for i, h in enumerate(headers, start=1):
+                c = ws_ov.cell(row=row, column=i, value=h)
+                c.font = white_font
+                c.fill = navy_fill
+                c.border = thin_border
+            row += 1
+            for left, right in payload:
+                ws_ov.cell(row=row, column=1, value=str(left or "")).font = regular_font
+                ws_ov.cell(row=row, column=2, value=str(right or "")).font = regular_font
+                ws_ov.cell(row=row, column=1).border = thin_border
+                ws_ov.cell(row=row, column=2).border = thin_border
+                row += 1
+        else:  # bullet list
+            for item in (payload or ["TBD"]):
+                ws_ov.cell(row=row, column=1, value=f"• {item}").font = regular_font
+                ws_ov.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
+                row += 1
+        row += 1
+
+    envs = plan.get("test_environments", [])
+    write_section("3. TEST ENVIRONMENTS", "table",
+                  [(e.get("name", e.get("category", "")), e.get("url", e.get("specification", ""))) for e in envs],
+                  ["Name", "Env url"])
+
+    defect = plan.get("defect_reporting", {}) or {}
+    write_section("4. DEFECT REPORTING PROCEDURE", "table",
+                  [(c.get("area", ""), c.get("poc", "TBD")) for c in defect.get("contacts", [])],
+                  ["Defect Process", "POC"])
+
+    strat = plan.get("test_strategy", {})
+    write_section("5. TEST STRATEGY", "list", [
+        f"Testing Types: {', '.join(strat.get('types', []))}",
+        f"Automation Approach: {strat.get('automation_approach', 'TBD')}"
+    ])
+
+    write_section("6. TEST SCHEDULE", "table",
+                  [(s.get("task", ""), s.get("dates", "TBD")) for s in plan.get("test_schedule", [])],
+                  ["Task", "Dates"])
+
+    write_section("7. TEST DELIVERABLES", "list", plan.get("test_deliverables"))
+    write_section("8. ENTRY CRITERIA", "list", plan.get("entry_criteria"))
+    write_section("9. EXIT CRITERIA", "list", plan.get("exit_criteria"))
+
+    execution = plan.get("test_execution", {}) or {}
+    write_section("10. TEST EXECUTION - ENTRY", "list", execution.get("entry_criteria"))
+    write_section("11. TEST EXECUTION - EXIT", "list", execution.get("exit_criteria"))
+
+    closure = plan.get("test_closure", {}) or {}
+    write_section("12. TEST CLOSURE - ENTRY", "list", closure.get("entry_criteria"))
+    write_section("13. TEST CLOSURE - EXIT", "list", closure.get("exit_criteria"))
+
+    write_section("14. TOOLS", "table",
+                  [(t.get("purpose", ""), t.get("tool", "TBD")) for t in plan.get("tools", [])],
+                  ["Purpose", "Tool"])
 
     # Sheet 2: Test Cases
     ws_tc = wb.create_sheet(title="Test Cases")
@@ -335,19 +459,78 @@ def export_markdown(plan, output_filepath):
     for exc in plan.get("scope", {}).get("exclusions", []):
         md += f"- {exc}\n"
 
-    md += "\n---\n\n## 3. Test Cases\n\n"
+    def md_table(headers, rows):
+        # Markdown needs a placeholder row, otherwise an empty section renders
+        # as a broken table with only a header separator.
+        out = f"\n| {headers[0]} | {headers[1]} |\n|---|---|\n"
+        if not rows:
+            return out + "| TBD | TBD |\n"
+        for left, right in rows:
+            out += f"| {left or ''} | {right or ''} |\n"
+        return out
+
+    def md_list(items, fallback="TBD"):
+        if not items:
+            return f"- {fallback}\n"
+        return "".join(f"- {i}\n" for i in items)
+
+    envs = plan.get("test_environments", [])
+    md += "\n---\n\n## 3. Test Environments\n"
+    md += md_table(["Name", "Env url"],
+                   [(e.get("name", e.get("category", "")), e.get("url", e.get("specification", ""))) for e in envs])
+
+    defect = plan.get("defect_reporting", {}) or {}
+    md += "\n---\n\n## 4. Defect Reporting Procedure\n"
+    if defect.get("procedure"):
+        md += f"\n{defect['procedure']}\n"
+    md += md_table(["Defect Process", "POC"],
+                   [(c.get("area", ""), c.get("poc", "TBD")) for c in defect.get("contacts", [])])
+
+    strat = plan.get("test_strategy", {})
+    md += "\n---\n\n## 5. Test Strategy\n"
+    md += f"\n**Testing Types:** {', '.join(strat.get('types', [])) or 'TBD'}\n"
+    md += f"\n**Automation Approach:** {strat.get('automation_approach', 'TBD')}\n"
+
+    md += "\n---\n\n## 6. Test Schedule\n"
+    md += md_table(["Task", "Dates"],
+                   [(s.get("task", ""), s.get("dates", "TBD")) for s in plan.get("test_schedule", [])])
+
+    md += "\n---\n\n## 7. Test Deliverables\n"
+    md += md_list(plan.get("test_deliverables"))
+
+    md += "\n---\n\n## 8. Test Cases\n\n"
     md += "| ID | Jira Key | Title | Type | Priority | Expected Result | Automation |\n"
     md += "|---|---|---|---|---|---|---|\n"
     for tc in plan.get("test_cases", []):
         md += f"| {tc.get('id')} | {tc.get('jira_reference')} | {tc.get('title')} | {tc.get('type')} | {tc.get('priority')} | {tc.get('expected_result')} | {tc.get('automation')} |\n"
 
-    md += "\n---\n\n## 4. Entry & Exit Criteria\n"
-    md += "### Entry Criteria\n"
-    for e in plan.get("entry_criteria", []):
-        md += f"- {e}\n"
-    md += "\n### Exit Criteria\n"
-    for e in plan.get("exit_criteria", []):
-        md += f"- {e}\n"
+    md += "\n---\n\n## 9. Entry and Exit Criteria\n"
+    md += "### Entry Criteria\n" + md_list(plan.get("entry_criteria"))
+    md += "\n### Exit Criteria\n" + md_list(plan.get("exit_criteria"))
+
+    execution = plan.get("test_execution", {}) or {}
+    md += "\n---\n\n## 10. Test Execution\n"
+    md += "### Entry Criteria\n" + md_list(execution.get("entry_criteria"))
+    md += "\n### Exit Criteria\n" + md_list(execution.get("exit_criteria"))
+
+    closure = plan.get("test_closure", {}) or {}
+    md += "\n---\n\n## 11. Test Closure\n"
+    md += "### Entry Criteria\n" + md_list(closure.get("entry_criteria"))
+    md += "\n### Exit Criteria\n" + md_list(closure.get("exit_criteria"))
+
+    md += "\n---\n\n## 12. Tools\n"
+    md += md_table(["Purpose", "Tool"],
+                   [(t.get("purpose", ""), t.get("tool", "TBD")) for t in plan.get("tools", [])])
+
+    md += "\n---\n\n## 13. Risks and Mitigations\n"
+    md += "\n| Risk | Impact | Mitigation |\n|---|---|---|\n"
+    for rk in plan.get("risks_and_mitigations", []) or []:
+        md += f"| {rk.get('risk', '')} | {rk.get('impact', '')} | {rk.get('mitigation', '')} |\n"
+
+    md += "\n---\n\n## 14. Approvals\n"
+    md += "\n| Role | Name | Status |\n|---|---|---|\n"
+    for a in plan.get("approvals", []) or []:
+        md += f"| {a.get('role', '')} | {a.get('name', 'Pending')} | {a.get('status', 'Pending')} |\n"
 
     os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
     with open(output_filepath, "w", encoding="utf-8") as f:

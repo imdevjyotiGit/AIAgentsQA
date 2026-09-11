@@ -9,7 +9,7 @@
     - Fields: Base URL, Model Name, API Key.
     - An explicit **"Test Connection" button** that executes an immediate ping/handshake test before saving.
 - **Step 2: Fetch Issues (`Testplantool2.png`)**
-  - Inputs: Product Name (e.g. `App.vwo.com`), Project Key (required, e.g. `VWOAPP`), Sprint/Fix Version (optional, e.g. `Sprint 15`), Additional Context (optional textarea).
+  - Inputs: Product Name (e.g. `XSM`), Project Key (required, e.g. `XSM`), Sprint/Fix Version (optional, e.g. `Sprint 15`), Additional Context (optional textarea).
   - Action: "Fetch Jira Issues" button.
 - **Step 3: Review (`Testplantool3.png`)**
   - Additional Context & Notes textarea.

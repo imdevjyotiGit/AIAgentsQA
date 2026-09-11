@@ -14,6 +14,26 @@ import ssl
 # Default SSL context (allows secure https)
 ssl_context = ssl.create_default_context()
 
+
+def normalize_jira_host(host):
+    """
+    Normalizes user-entered Jira hosts into a resolvable base URL.
+
+    Accepts 'mysite', 'mysite.atlassian.net', or a full 'https://jira.company.com'.
+    A bare single-label name (no dot) is assumed to be an Atlassian Cloud site name,
+    since that is the most common entry mistake — typing the site or project name
+    alone produces an unresolvable host like 'https://mysite'.
+    """
+    clean = (host or "").strip().rstrip("/")
+    if not clean:
+        return clean
+    if not clean.startswith("http://") and not clean.startswith("https://"):
+        # Bare name with no domain part -> assume Atlassian Cloud
+        if "." not in clean.split("/")[0]:
+            clean = f"{clean}.atlassian.net"
+        clean = "https://" + clean
+    return clean
+
 def test_ollama(base_url="http://localhost:11434", model=None):
     """Verifies local Ollama service availability and installed models."""
     base = base_url.rstrip("/")
@@ -33,9 +53,19 @@ def test_ollama(base_url="http://localhost:11434", model=None):
                 }
                 if model:
                     matched = any(m == model or m.startswith(f"{model}:") for m in models)
+                    # Ollama Cloud models (the "-cloud" suffix) execute on
+                    # Ollama's servers and never appear in local /api/tags, so
+                    # a missing entry is expected rather than a misconfiguration.
+                    is_cloud = model.endswith("-cloud")
                     res["selected_model"] = model
                     res["model_installed"] = matched
-                    if not matched:
+                    res["is_cloud_model"] = is_cloud
+                    if is_cloud:
+                        res["message"] = (
+                            f"Ollama online. '{model}' is a CLOUD model - it runs on "
+                            "Ollama's servers, so prompt text leaves this machine."
+                        )
+                    elif not matched:
                         res["warning"] = f"Model '{model}' is not listed in local Ollama tags. Available: {', '.join(models)}"
                 return res
     except urllib.error.URLError as e:
@@ -58,10 +88,8 @@ def test_jira(host, email, api_token):
     if not host or not api_token:
         return {"status": "error", "provider": "jira", "message": "Jira URL and API Token are required."}
     
-    clean_host = host.strip().rstrip("/")
-    if not clean_host.startswith("http://") and not clean_host.startswith("https://"):
-        clean_host = "https://" + clean_host
-        
+    clean_host = normalize_jira_host(host)
+
     auth_header = None
     if email and email.strip():
         # Cloud Basic Auth (email:api_token)
@@ -106,11 +134,23 @@ def test_jira(host, email, api_token):
                     "message": f"Authentication failed ({last_error}). Verify your email and API Token."
                 }
         except urllib.error.URLError as e:
+            reason = str(e.reason)
+            # getaddrinfo/DNS failures almost always mean the site URL is wrong,
+            # so give an actionable hint instead of the raw socket error.
+            if "getaddrinfo" in reason or "Name or service not known" in reason:
+                hint = (
+                    f"Host '{clean_host}' could not be resolved (DNS lookup failed). "
+                    "Enter the full Jira base URL, e.g. https://hclsw-io.atlassian.net "
+                    "for Jira Cloud or https://jira.your-company.com for Jira Server/Data Center. "
+                    "This should be the site URL, not the project key."
+                )
+            else:
+                hint = f"Connection failed to {clean_host}. Error: {reason}"
             return {
                 "status": "error",
                 "provider": "jira",
                 "host": clean_host,
-                "message": f"Connection failed to {clean_host}. Error: {e.reason}"
+                "message": hint
             }
         except Exception as e:
             last_error = str(e)
@@ -172,7 +212,7 @@ def test_openai_compatible(provider_name, base_url, api_key, model):
             "message": f"Connection failed: {str(e)}"
         }
 
-def test_claude(api_key, model="claude-3-5-sonnet-20241022"):
+def test_claude(api_key, model="claude-sonnet-5"):
     """Verifies connection to Anthropic Claude API."""
     if not api_key:
         return {"status": "error", "provider": "claude", "message": "Anthropic API Key required."}

@@ -29,7 +29,7 @@
       <div class="header-right">
         <div class="connection-pill" id="globalStatusPill">
           <span class="status-dot online"></span>
-          <span id="globalStatusText">Ollama: Ready</span>
+          <span id="globalStatusText">Claude: Not connected</span>
         </div>
         <button class="btn btn-secondary btn-sm" id="viewHistoryBtn">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -77,8 +77,8 @@
             <div class="form-grid">
               <div class="form-group full-width">
                 <label for="jiraUrl">Jira Host URL *</label>
-                <input type="text" id="jiraUrl" class="form-control" placeholder="e.g. https://your-domain.atlassian.net or 'demo' for mock stories" value="demo">
-                <span class="form-hint">Enter your Atlassian Cloud URL, Server URL, or keep 'demo' to test with VWO sample issues.</span>
+                <input type="text" id="jiraUrl" class="form-control" placeholder="e.g. https://hclsw-io.atlassian.net or 'demo' for mock stories" value="https://hclsw-io.atlassian.net">
+                <span class="form-hint">Full site URL, not a project key. Jira Cloud: <code>https://hclsw-io.atlassian.net</code>. Server/DC: <code>https://jira.your-company.com</code>. Keep 'demo' to test with XSM sample issues.</span>
               </div>
               <div class="form-group">
                 <label for="jiraEmail">Email / Username</label>
@@ -109,24 +109,24 @@
               <h2 class="card-title">AI Engine Settings (LLM Connection)</h2>
               <p class="card-desc">Choose and test your AI reasoning provider for generating deterministic test plans</p>
             </div>
-            <span class="badge badge-success" id="llmStatusBadge">Ollama Online</span>
+            <span class="badge badge-neutral" id="llmStatusBadge">Claude — Not Tested</span>
           </div>
           <div class="card-body">
             <div class="form-grid">
               <div class="form-group">
                 <label for="llmProvider">LLM Provider *</label>
                 <select id="llmProvider" class="form-control">
-                  <option value="ollama" selected>Ollama (Local)</option>
+                  <option value="ollama" selected>Ollama (Local / Cloud)</option>
+                  <option value="claude">Claude (Anthropic API)</option>
                   <option value="groq">Groq Cloud (Fast Llama 3.3)</option>
                   <option value="grok">Grok (xAI API)</option>
                   <option value="chatgpt">ChatGPT (OpenAI API)</option>
-                  <option value="claude">Claude (Anthropic API)</option>
                 </select>
               </div>
               <div class="form-group">
                 <label for="llmModel">Model Name *</label>
-                <input type="text" id="llmModel" class="form-control" value="llama3.2:3b">
-                <span class="form-hint" id="llmModelHint">Detected locally: llama3.2:3b, llama3.2:1b</span>
+                <input type="text" id="llmModel" class="form-control" value="gemma4:31b-cloud">
+                <span class="form-hint" id="llmModelHint">Ollama. Cloud: gemma4:31b-cloud (faster, runs on Ollama servers). Fully local: llama3.2:3b</span>
               </div>
               <div class="form-group">
                 <label for="llmBaseUrl">Base Endpoint URL</label>
@@ -135,7 +135,7 @@
               <div class="form-group">
                 <label for="llmApiKey">API Key</label>
                 <div class="input-with-action">
-                  <input type="password" id="llmApiKey" class="form-control" placeholder="Optional for local Ollama">
+                  <input type="password" id="llmApiKey" class="form-control" placeholder="Required for Claude (Anthropic API key); optional for local Ollama">
                   <button type="button" class="btn-toggle-pw" onclick="togglePassword('llmApiKey')">👁️</button>
                 </div>
               </div>
@@ -167,7 +167,7 @@
                   <div class="template-opt-title">
                     <span class="opt-icon">📊</span> Inbuilt Template (Excel & Word)
                   </div>
-                  <p class="template-opt-desc">Pre-configured corporate format matching VWO test plan standards (Overview, Test Cases, Risks & Approvals).</p>
+                  <p class="template-opt-desc">Pre-configured corporate format matching the standard test plan template (Overview, Test Cases, Risks &amp; Approvals).</p>
                   <div class="template-meta-tags">
                     <span class="tag">Multi-sheet .xlsx</span>
                     <span class="tag">Styled .docx</span>
@@ -316,7 +316,7 @@
             <div class="form-grid">
               <div class="form-group">
                 <label for="directProductName">Product / App Name *</label>
-                <input type="text" id="directProductName" class="form-control" value="VWO Platform" placeholder="e.g. E-Commerce Store, Mobile App">
+                <input type="text" id="directProductName" class="form-control" value="XSM" placeholder="e.g. XSM or https://xsmtest.dryice-aws.com/">
               </div>
               <div class="form-group">
                 <label for="directStoryTitle">Story Title / Feature Name *</label>
@@ -360,11 +360,11 @@
             <div class="form-grid">
               <div class="form-group">
                 <label for="productName">Product Name *</label>
-                <input type="text" id="productName" class="form-control" value="App.vwo.com" placeholder="e.g. App.vwo.com">
+                <input type="text" id="productName" class="form-control" value="XSM" placeholder="e.g. XSM or https://xsmtest.dryice-aws.com/">
               </div>
               <div class="form-group">
                 <label for="projectKey">Project Key *</label>
-                <input type="text" id="projectKey" class="form-control" value="VWOAPP" placeholder="e.g. VWOAPP">
+                <input type="text" id="projectKey" class="form-control" value="XSM" placeholder="e.g. XSM">
               </div>
               <div class="form-group">
                 <label for="sprintVersion">Sprint / Fix Version (Optional)</label>
@@ -372,7 +372,7 @@
               </div>
               <div class="form-group">
                 <label for="specificIssues">Specific Jira IDs (Optional)</label>
-                <input type="text" id="specificIssues" class="form-control" placeholder="e.g. VWOAPP-101, VWOAPP-102">
+                <input type="text" id="specificIssues" class="form-control" placeholder="e.g. XSM-45372, XSM-45373">
               </div>
               <div class="form-group full-width">
                 <label for="additionalContext">Additional Context (Optional)</label>
@@ -461,10 +461,10 @@
           <!-- Top summary banner -->
           <div class="plan-summary-banner">
             <div>
-              <h2 class="plan-heading" id="planTitle">Test Plan: VWO Platform</h2>
+              <h2 class="plan-heading" id="planTitle">Test Plan: XSM</h2>
               <div class="plan-tags">
-                <span class="badge badge-primary" id="planKeyTag">VWOAPP</span>
-                <span class="badge badge-neutral" id="planModelTag">Ollama</span>
+                <span class="badge badge-primary" id="planKeyTag">XSM</span>
+                <span class="badge badge-neutral" id="planModelTag">Claude</span>
                 <span class="badge badge-success" id="planCasesCountTag">4 Test Cases</span>
               </div>
             </div>
@@ -478,6 +478,34 @@
               <button class="btn btn-outline btn-sm" onclick="copyMarkdown()">
                 📋 Copy Markdown
               </button>
+            </div>
+          </div>
+
+          <!-- Refine / regenerate the plan in place -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Refine This Test Plan</h2>
+                <p class="card-desc">Add further context or instructions, then improve the plan above or regenerate it from scratch</p>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="form-group full-width">
+                <label for="refineContext">Additional Context / Instructions</label>
+                <textarea id="refineContext" class="form-control" rows="3"
+                  placeholder="e.g. Add negative cases for timezone boundaries; include API-level validation for the Testing Window; expand security coverage for approver reassignment."></textarea>
+                <span class="form-hint">"Improve" keeps the existing test cases and their IDs, then applies your instructions. "Regenerate" discards the current plan and starts fresh.</span>
+              </div>
+              <div class="card-actions">
+                <button class="btn btn-primary" id="btnImprovePlan">
+                  <span class="spinner hidden" id="refineSpinner"></span>
+                  ✨ Improve This Plan
+                </button>
+                <button class="btn btn-outline" id="btnRegeneratePlan">
+                  🔄 Regenerate From Scratch
+                </button>
+                <div class="test-feedback" id="refineFeedback"></div>
+              </div>
             </div>
           </div>
 

@@ -7,7 +7,7 @@
 ---
 
 ## 🎯 Project Overview
-An intelligent agent application that connects to requirement & issue tracking platforms (Jira, Azure DevOps, Xray), fetches user stories / requirements, configures LLM providers (Ollama default, Groq, Grok, Claude, ChatGPT) with real-time connection testing, and generates comprehensive, structured test plans matching standardized organizational templates (Word `.docx` and Excel `.xlsx`).
+An intelligent agent application that connects to requirement & issue tracking platforms (Jira, Azure DevOps, Xray), fetches user stories / requirements, configures LLM providers (Claude default, Ollama, Groq, Grok, ChatGPT) with real-time connection testing, and generates comprehensive, structured test plans matching standardized organizational templates (Word `.docx` and Excel `.xlsx`).
 
 ---
 
@@ -23,7 +23,7 @@ An intelligent agent application that connects to requirement & issue tracking p
 ### 🏗️ Phase 1: B - Blueprint (Vision & Logic)
 - [x] Present the 5 Discovery Questions to the user
 - [x] Synthesize requirements from UI screenshots (`Testplantool1-4.png`) and template (`Test Plan - Template.docx`)
-- [x] Confirm LLM integration requirements (Ollama default, Groq, Grok, Claude, ChatGPT)
+- [x] Confirm LLM integration requirements (Claude default, Ollama, Groq, Grok, ChatGPT)
 - [x] Confirm requirement sources (Jira on-the-fly with URL + API Token + Email)
 - [x] Confirm lightweight frontend architecture (HTML + CSS + JS)
 - [x] Define JSON Data Schemas in `gemini.md`

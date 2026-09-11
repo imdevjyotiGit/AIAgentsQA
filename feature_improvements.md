@@ -116,7 +116,7 @@ Transition from a single-agent architecture to a coordinated multi-agent team:
 - **Slack / Microsoft Teams Bot Integration**:
   - Interactive bot interface allowing QA leads to trigger test plan generation via slash commands:
     ```
-    /testplan generate --project VWO --sprint "Sprint 42" --export docx
+    /testplan generate --project XSM --sprint "Sprint 42" --export docx
     ```
 - **Pull Request Quality Gate**:
   - Run as a GitHub Action that inspects PR diffs, cross-references with linked Jira tickets, and checks if sufficient test coverage was generated and executed.

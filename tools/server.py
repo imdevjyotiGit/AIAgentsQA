@@ -9,7 +9,7 @@ import os
 import sys
 import json
 import urllib.parse
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
 # Import Layer 3 tools
 from test_connection import test_ollama, test_jira, test_openai_compatible, test_claude
@@ -76,6 +76,18 @@ class TestPlannerRequestHandler(SimpleHTTPRequestHandler):
                 self._send_json({"status": "error", "message": "File not found"}, 404)
                 return
 
+        # Liveness probe for Docker HEALTHCHECK, Jenkins smoke tests and any
+        # load balancer in front of the app. Deliberately dependency-free: it
+        # must answer even when Ollama or Jira are unreachable, so that an
+        # outage in a downstream service does not get the container killed.
+        if parsed.path in ("/health", "/healthz"):
+            self._send_json({
+                "status": "ok",
+                "service": "intelligent-test-planning-agent",
+                "version": os.environ.get("APP_VERSION", "dev")
+            })
+            return
+
         # Fallback to serving web frontend static files
         super().do_GET()
 
@@ -88,10 +100,10 @@ class TestPlannerRequestHandler(SimpleHTTPRequestHandler):
 
             # 1. Test LLM Connection
             if path == "/api/test-connection/llm":
-                provider = req_data.get("provider", "ollama")
-                base_url = req_data.get("base_url", "http://localhost:11434")
+                provider = req_data.get("provider", "claude")
+                base_url = req_data.get("base_url", "https://api.anthropic.com/v1")
                 api_key = req_data.get("api_key", "")
-                model = req_data.get("model", "llama3.2:3b")
+                model = req_data.get("model", "claude-sonnet-5")
 
                 if provider == "ollama":
                     res = test_ollama(base_url=base_url, model=model)
@@ -102,7 +114,7 @@ class TestPlannerRequestHandler(SimpleHTTPRequestHandler):
                 elif provider == "grok":
                     res = test_openai_compatible("Grok", base_url or "https://api.x.ai/v1", api_key, model or "grok-2")
                 elif provider == "claude":
-                    res = test_claude(api_key, model or "claude-3-5-sonnet-20241022")
+                    res = test_claude(api_key, model or "claude-sonnet-5")
                 else:
                     res = {"status": "error", "message": f"Unknown provider: {provider}"}
                 self._send_json(res)
@@ -134,19 +146,22 @@ class TestPlannerRequestHandler(SimpleHTTPRequestHandler):
 
             # 4. Generate Test Plan
             if path == "/api/generate-plan":
-                provider = req_data.get("provider", "ollama")
+                provider = req_data.get("provider", "claude")
                 config = req_data.get("config", {})
                 issues = req_data.get("issues", [])
                 context = req_data.get("context", "")
-                product_name = req_data.get("product_name", "VWO Platform")
-                project_key = req_data.get("project_key", "VWOAPP")
+                product_name = req_data.get("product_name", "XSM")
+                project_key = req_data.get("project_key", "XSM")
+                # Present only on a refine request - the plan currently on screen.
+                existing_plan = req_data.get("existing_plan")
                 res = generate_test_plan(
                     provider=provider,
                     config=config,
                     issues=issues,
                     context=context,
                     product_name=product_name,
-                    project_key=project_key
+                    project_key=project_key,
+                    existing_plan=existing_plan
                 )
                 self._send_json(res)
                 return
@@ -186,14 +201,30 @@ class TestPlannerRequestHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             self._send_json({"status": "error", "message": str(e)}, 500)
 
-def run_server(port=8088):
-    server_address = ("127.0.0.1", port)
-    httpd = HTTPServer(server_address, TestPlannerRequestHandler)
-    print(f"Test Planner Agent Server running at: http://127.0.0.1:{port}")
+def run_server(port=8088, host=None):
+    """
+    Starts the agent server.
+
+    Host defaults to 127.0.0.1 for local use. In a container it must bind
+    0.0.0.0 or the published port is unreachable, so HOST is read from the
+    environment and can be overridden per deployment.
+
+    ThreadingHTTPServer (not HTTPServer) is required for multi-user hosting:
+    a single plan generation can occupy a worker for minutes, and the
+    single-threaded server would queue every other user behind it.
+    """
+    host = host or os.environ.get("HOST", "127.0.0.1")
+    server_address = (host, port)
+    httpd = ThreadingHTTPServer(server_address, TestPlannerRequestHandler)
+    httpd.daemon_threads = True
+    display_host = "127.0.0.1" if host in ("0.0.0.0", "") else host
+    print(f"Test Planner Agent Server running at: http://{display_host}:{port} (bound to {host})")
     httpd.serve_forever()
 
 if __name__ == "__main__":
-    port = 8088
+    # PORT/HOST env vars take precedence for container and CI use; the
+    # positional argument stays supported for the documented local command.
+    port = int(os.environ.get("PORT", 8088))
     if len(sys.argv) > 1:
         port = int(sys.argv[1])
     run_server(port)

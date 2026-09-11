@@ -24,20 +24,20 @@ This document is the **Law** of the project. All code, tools, and UI logic must 
 {
   "connection": {
     "provider": "jira",
-    "host": "https://your-domain.atlassian.net",
+    "host": "https://hclsw-io.atlassian.net",
     "email": "user@domain.com",
     "api_token": "secret_token"
   },
   "query": {
-    "product_name": "VWO Platform",
-    "project_key": "VWOAPP",
-    "issue_ids": ["VWOAPP-101", "VWOAPP-102"],
+    "product_name": "XSM",
+    "project_key": "XSM",
+    "issue_ids": ["XSM-101", "XSM-102"],
     "sprint": "Sprint 15",
     "additional_context": "Focus on cross-browser and payment gateway edge cases"
   },
   "fetched_issues": [
     {
-      "id": "VWOAPP-101",
+      "id": "XSM-101",
       "summary": "User Checkout Authentication Flow",
       "description": "As a shopper, I need to log in or continue as guest at checkout.",
       "acceptance_criteria": [
@@ -92,7 +92,7 @@ This document is the **Law** of the project. All code, tools, and UI logic must 
   "test_cases": [
     {
       "id": "TC-001",
-      "jira_reference": "VWOAPP-101",
+      "jira_reference": "XSM-101",
       "module": "Authentication",
       "title": "Valid login at checkout",
       "type": "Positive / Smoke",

@@ -45,15 +45,24 @@ const PROVIDER_DEFAULTS = {
   },
   claude: {
     url: "https://api.anthropic.com/v1",
-    model: "claude-3-5-sonnet-20241022",
-    hint: "Anthropic Claude API"
+    model: "claude-sonnet-5",
+    hint: "Anthropic Claude API. Alternatives: claude-opus-5, claude-haiku-4-5-20251001"
   }
 };
 
 document.addEventListener("DOMContentLoaded", () => {
   initEventListeners();
-  // Automatically verify Ollama on load
-  testLlmConnection(true);
+  // Only auto-verify when we actually have what the provider needs: a key for cloud
+  // providers, nothing for local Ollama. Otherwise a pointless "Offline" badge shows
+  // up before the user has had a chance to enter credentials.
+  const provider = document.getElementById("llmProvider").value;
+  const hasKey = Boolean(document.getElementById("llmApiKey").value.trim());
+  if (provider === "ollama" || hasKey) {
+    testLlmConnection(true);
+  } else {
+    document.getElementById("llmFeedback").textContent =
+      "Enter your API key for this provider, then click Test Connection.";
+  }
 });
 
 function initEventListeners() {
@@ -97,6 +106,8 @@ function initEventListeners() {
   document.getElementById("btnTestLlm").addEventListener("click", () => testLlmConnection(false));
   document.getElementById("btnFetchIssues").addEventListener("click", fetchJiraIssues);
   document.getElementById("btnGeneratePlan").addEventListener("click", generatePlan);
+  document.getElementById("btnImprovePlan").addEventListener("click", () => refinePlan("improve"));
+  document.getElementById("btnRegeneratePlan").addEventListener("click", () => refinePlan("regenerate"));
 
   // Plan viewer tabs
   document.querySelectorAll(".plan-tab").forEach(tab => {
@@ -259,22 +270,23 @@ function switchRequirementMode(mode) {
 
 // Pre-fill realistic sample story
 function loadSampleStory() {
-  document.getElementById("directProductName").value = "VWO Testing Platform";
-  document.getElementById("directStoryTitle").value = "Visual Website Optimizer - A/B Test Campaign Creation";
-  document.getElementById("directStoryText").value = 
-    "As a Growth Marketing Specialist, I want to configure and launch an A/B test campaign on my landing page, so that I can compare conversion rates between variations and increase sign-up conversions.";
-  
-  document.getElementById("directAcceptanceCriteria").value = 
-    "1. User can define Control (original URL) and at least one Variation URL.\n" +
-    "2. Visual Editor loads within 3 seconds and allows changing headlines, CTA button text, and colors.\n" +
-    "3. Traffic split percentage must total exactly 100% across all variations.\n" +
-    "4. Primary conversion goal must be selected (e.g. CTA Click, Page Visit, Form Submit, Revenue).\n" +
-    "5. Show validation error if campaign name contains special characters or exceeds 120 characters.\n" +
-    "6. Support targeting rules: device type (Desktop, Mobile, Tablet), geo-location, and cookie conditions.\n" +
-    "7. Campaign can be saved as Draft or launched directly into Live status.";
+  document.getElementById("directProductName").value = "XSM";
+  document.getElementById("directStoryTitle").value = "Change Management - Test Task scheduling within the Testing Window";
+  document.getElementById("directStoryText").value =
+    "As a Change Manager, I want Test Task planned dates to be constrained to the Testing Window defined on the Change request, so that test scheduling cannot drift outside the approved window.";
 
-  document.getElementById("directAdditionalNotes").value = 
-    "Focus on cross-browser compatibility (Chrome, Safari, Firefox), mobile viewports, and negative validation when traffic distribution != 100%.";
+  document.getElementById("directAcceptanceCriteria").value =
+    "1. Enabling 'Testing Required' on a Change reveals the Testing Start Date and Testing End Date fields.\n" +
+    "2. Default Test Tasks inherit Planned Start and Planned End dates from the Change Testing Window.\n" +
+    "3. Saving a Test Task with dates outside the Testing Window is blocked with a validation error.\n" +
+    "4. Testing End Date cannot be earlier than Testing Start Date.\n" +
+    "5. Editing the Testing Window on an approved Change requires re-approval.\n" +
+    "6. The audit trail records every date change with actor, timestamp, and previous value.\n" +
+    "7. Test Tasks cannot be closed while the parent Change is still in Scheduled status.";
+
+  document.getElementById("directAdditionalNotes").value =
+    "Environment under test: https://xsmtest.dryice-aws.com/\n" +
+    "Focus on boundary conditions at the window start and end dates, timezone handling, and negative validation when dates fall outside the Testing Window.";
 
   const feedback = document.getElementById("directFeedback");
   feedback.textContent = "✓ Sample story loaded! You can now edit it or click 'Generate Test Plan Now'.";
@@ -359,7 +371,7 @@ async function fetchJiraIssues() {
     host: document.getElementById("jiraUrl").value || "demo",
     email: document.getElementById("jiraEmail").value,
     api_token: document.getElementById("jiraToken").value,
-    project_key: document.getElementById("projectKey").value || "VWOAPP",
+    project_key: document.getElementById("projectKey").value || "XSM",
     issue_keys: document.getElementById("specificIssues").value,
     sprint: document.getElementById("sprintVersion").value
   };
@@ -374,8 +386,19 @@ async function fetchJiraIssues() {
     spinner.classList.add("hidden");
 
     if (data.status === "success") {
-      state.fetchedIssues = data.issues || [];
+      // Every downstream step keys off issue.key. A Jira issue that arrives
+      // without one (permission-filtered field, unusual deployment) would
+      // otherwise land in fetchedIssues but never match a selected key, so
+      // the plan would silently generate from zero issues.
+      state.fetchedIssues = (data.issues || []).map((issue, idx) => ({
+        ...issue,
+        key: issue.key || `ISSUE-${idx + 1}`
+      }));
       state.selectedIssueKeys = new Set(state.fetchedIssues.map(i => i.key));
+      console.info(
+        "[fetchJiraIssues] %d issue(s), keys:", state.fetchedIssues.length,
+        [...state.selectedIssueKeys]
+      );
 
       feedback.textContent = `✓ Found ${state.fetchedIssues.length} issues from Jira.`;
       feedback.className = "test-feedback success";
@@ -451,9 +474,16 @@ async function generatePlan() {
   const spinner = document.getElementById("generateSpinner");
   const btn = document.getElementById("btnGeneratePlan");
 
-  if (state.selectedIssueKeys.size === 0) {
-    alert("Please enter a user story in Step 2 or fetch issues from Jira to test!");
+  // Distinguish "nothing fetched" from "fetched but nothing ticked" - the old
+  // message sent the user back to Step 2 even when the issues were sitting
+  // right there on Step 3 with their checkboxes cleared.
+  if (state.fetchedIssues.length === 0) {
+    alert("No requirements loaded yet.\n\nGo to Step 2 and either write a story directly or fetch issues from Jira.");
     goToStep(2);
+    return;
+  }
+  if (state.selectedIssueKeys.size === 0) {
+    alert(`${state.fetchedIssues.length} issue(s) are loaded but none are selected.\n\nTick at least one issue checkbox in the list above, then click Generate again.`);
     return;
   }
 
@@ -463,18 +493,104 @@ async function generatePlan() {
 
   const selectedIssues = state.fetchedIssues.filter(i => state.selectedIssueKeys.has(i.key));
   const reviewNotes = document.getElementById("reviewContext").value;
+
+  // Guard against a key mismatch between the fetched list and the selection
+  // set - without this the request goes out with an empty issues array and
+  // the model invents a plan with nothing to base it on.
+  if (selectedIssues.length === 0) {
+    console.error(
+      "[generatePlan] key mismatch. fetched:", state.fetchedIssues.map(i => i.key),
+      "selected:", [...state.selectedIssueKeys]
+    );
+    // The button was already put into its loading state above, so restore it
+    // before bailing out - otherwise it stays disabled and looks hung.
+    spinner.classList.add("hidden");
+    btn.disabled = false;
+    btn.innerHTML = `✨ Generate Test Plan`;
+    alert("Could not match the selected issues to the fetched list.\n\nPlease re-fetch the issues in Step 2 and try again.");
+    return;
+  }
   
+  await runPlanGeneration({
+    selectedIssues,
+    extraContext: reviewNotes,
+    button: btn,
+    spinner,
+    idleLabel: `✨ Generate Test Plan`
+  });
+}
+
+// 4b. Refine the plan already on screen.
+//     mode "improve"    -> send the current plan back so the model revises it
+//     mode "regenerate" -> discard it and generate fresh from the requirements
+async function refinePlan(mode) {
+  const btnImprove = document.getElementById("btnImprovePlan");
+  const btnRegen = document.getElementById("btnRegeneratePlan");
+  const spinner = document.getElementById("refineSpinner");
+  const feedback = document.getElementById("refineFeedback");
+  const refineNotes = document.getElementById("refineContext").value.trim();
+
+  if (mode === "improve" && !state.generatedPlan) {
+    alert("There is no plan on screen to improve yet. Generate one first.");
+    return;
+  }
+  if (mode === "improve" && !refineNotes) {
+    feedback.textContent = "✕ Describe what to improve before running a refinement.";
+    feedback.className = "test-feedback error";
+    document.getElementById("refineContext").focus();
+    return;
+  }
+  if (mode === "regenerate" &&
+      !confirm("Regenerate from scratch?\n\nThe current plan will be replaced.")) {
+    return;
+  }
+
+  const selectedIssues = state.fetchedIssues.filter(i => state.selectedIssueKeys.has(i.key));
+  if (selectedIssues.length === 0) {
+    alert("The original requirements are no longer loaded.\n\nGo back to Step 2 and load them again.");
+    goToStep(2);
+    return;
+  }
+
+  const reviewNotes = document.getElementById("reviewContext")?.value || "";
+  // Both buttons drive the same request, so disable the pair for the duration.
+  btnRegen.disabled = true;
+
+  const ok = await runPlanGeneration({
+    selectedIssues,
+    extraContext: [reviewNotes, refineNotes].filter(Boolean).join("\n\n"),
+    existingPlan: mode === "improve" ? state.generatedPlan : null,
+    button: btnImprove,
+    spinner,
+    idleLabel: `✨ Improve This Plan`,
+    verb: mode === "improve" ? "Improving" : "Regenerating"
+  });
+
+  btnRegen.disabled = false;
+  if (ok) {
+    feedback.textContent = mode === "improve"
+      ? "✓ Plan improved. Review the updated test cases above."
+      : "✓ Plan regenerated from the original requirements.";
+    feedback.className = "test-feedback success";
+    document.getElementById("refineContext").value = "";
+  }
+}
+
+// Shared request path for every kind of plan run (new, improve, regenerate).
+// Returns true on success so callers can report their own outcome.
+async function runPlanGeneration({ selectedIssues, extraContext, existingPlan = null,
+                                   button, spinner, idleLabel, verb = "Generating" }) {
   const isDirect = state.reqMode === "direct";
-  const prodName = (isDirect 
-    ? document.getElementById("directProductName")?.value 
-    : document.getElementById("productName")?.value) || "Web Platform";
+  const prodName = (isDirect
+    ? document.getElementById("directProductName")?.value
+    : document.getElementById("productName")?.value) || "XSM";
   const projKey = (isDirect
-    ? (document.getElementById("directStoryTitle")?.value?.slice(0, 8)?.replace(/\s+/g, "_") || "STORY")
-    : document.getElementById("projectKey")?.value) || "REQ";
+    ? (document.getElementById("directStoryTitle")?.value?.slice(0, 8)?.replace(/\s+/g, "_") || "XSM")
+    : document.getElementById("projectKey")?.value) || "XSM";
   const initialContext = (isDirect
     ? document.getElementById("directAdditionalNotes")?.value
     : document.getElementById("additionalContext")?.value) || "";
-  const combinedContext = [initialContext, reviewNotes].filter(Boolean).join("\n\n");
+  const combinedContext = [initialContext, extraContext].filter(Boolean).join("\n\n");
 
   const payload = {
     provider: document.getElementById("llmProvider").value,
@@ -489,6 +605,28 @@ async function generatePlan() {
     project_key: projKey,
     template_type: state.templateType
   };
+  if (existingPlan) payload.existing_plan = existingPlan;
+
+  if (spinner) spinner.classList.remove("hidden");
+  button.disabled = true;
+
+  // A local model can take minutes. Without a running clock a static spinner
+  // is indistinguishable from a hung page.
+  const startedAt = Date.now();
+  const isLocalOllama = payload.provider === "ollama" && !payload.config.model.endsWith("-cloud");
+  const ticker = setInterval(() => {
+    const secs = Math.round((Date.now() - startedAt) / 1000);
+    button.innerHTML =
+      `<span class="spinner"></span> ${verb}... ${secs}s` +
+      (isLocalOllama ? ` (local model, may take minutes)` : ``);
+  }, 1000);
+
+  const reset = () => {
+    clearInterval(ticker);
+    if (spinner) spinner.classList.add("hidden");
+    button.disabled = false;
+    button.innerHTML = idleLabel;
+  };
 
   try {
     const res = await fetch("/api/generate-plan", {
@@ -497,21 +635,23 @@ async function generatePlan() {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
-
-    btn.disabled = false;
-    btn.innerHTML = `✨ Generate Test Plan`;
+    reset();
 
     if (data.status === "success") {
       state.generatedPlan = data.plan;
       renderPlanView(data.plan);
       goToStep(4);
-    } else {
-      alert(`Plan Generation Error: ${data.message}`);
+      return true;
     }
+    // detail/log_file are added by the backend so a failure points at the
+    // log rather than leaving the user guessing.
+    const extra = data.log_file ? `\n\nFull traceback: ${data.log_file}` : "";
+    alert(`Plan Generation Error: ${data.message}${extra}`);
+    return false;
   } catch (err) {
-    btn.disabled = false;
-    btn.innerHTML = `✨ Generate Test Plan`;
+    reset();
     alert(`Failed to communicate with generator: ${err.message}`);
+    return false;
   }
 }
 
@@ -522,7 +662,7 @@ function renderPlanView(plan) {
 
   const meta = plan.metadata || {};
   document.getElementById("planTitle").textContent = `Test Plan: ${meta.product_name || "Platform"}`;
-  document.getElementById("planKeyTag").textContent = meta.project_key || "VWOAPP";
+  document.getElementById("planKeyTag").textContent = meta.project_key || "XSM";
   document.getElementById("planModelTag").textContent = meta.llm_model || "AI Model";
   document.getElementById("planCasesCountTag").textContent = `${(plan.test_cases || []).length} Test Cases`;
 
@@ -538,8 +678,12 @@ function renderPlanView(plan) {
   // Strategy & Environments
   const strat = plan.test_strategy || {};
   document.getElementById("planStrategyText").textContent = `Testing Types: ${(strat.types || []).join(", ")}. Automation Strategy: ${strat.automation_approach || "Standard automated regression suite."}`;
+  // Template columns are Name / Env url; fall back to the older
+  // category/specification shape so previously generated plans still render.
   const envs = plan.test_environments || [];
-  document.getElementById("planEnvironmentsList").innerHTML = envs.map(e => `<span class="env-badge">${e.category}: ${e.specification}</span>`).join("");
+  document.getElementById("planEnvironmentsList").innerHTML = envs
+    .map(e => `<span class="env-badge">${e.name || e.category || "Environment"}: ${e.url || e.specification || "TBD"}</span>`)
+    .join("");
 
   // Entry & Exit
   document.getElementById("planEntryCriteria").innerHTML = (plan.entry_criteria || []).map(c => `<li>${c}</li>`).join("");

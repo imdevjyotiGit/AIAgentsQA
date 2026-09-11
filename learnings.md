@@ -17,7 +17,7 @@ This document captures key technical takeaways, design decisions, challenges, an
   - **Solution**: Implemented an ADF-to-text normalizer that traverses nodes recursively, yielding clean markdown for LLM consumption while cutting token usage by up to 60%.
 - **Resilience via Offline Mock Fallbacks**:
   - Developers and QA testers often need to test agent workflows without access to a production Jira tenant or corporate VPN.
-  - Providing a first-class `"demo"` mode with realistic, multi-layered user stories (e.g. VWO platform campaign creation) drastically improves developer velocity and automated testing reliability.
+  - Providing a first-class `"demo"` mode with realistic, multi-layered user stories (e.g. XSM change management workflows) drastically improves developer velocity and automated testing reliability.
 - **Zero-Friction Ingestion: Decoupling Requirements from Tool Dependencies**:
   - Forcing users to configure external issue tracking tools (Jira, ADO) before experiencing any value leads to friction, abandonment, and permission bottlenecks (e.g. corporate SSO or restricted API token creation).
   - In practice, QA engineers often receive requirement drafts from Slack threads, Confluence PRDs, Google Docs, or user story brainstorms.
